@@ -22,10 +22,66 @@ make install-deps
 make dev
 ```
 
+## 📦 Instalação
+
+```bash
+uv tool install .
+```
+
+Isso instala o executável `update-fork-repositories` em `~/.local/bin/`
+(certifique-se de que essa pasta está no seu `PATH`).
+
+## ⚙️ Configuração
+
+Crie o arquivo de configuração em
+`~/.config/update-fork-repositories/config.json`, listando os repositórios
+fork locais a sincronizar (schema completo em
+[specs/001-update-fork-repositories/contracts/config.schema.json](specs/001-update-fork-repositories/contracts/config.schema.json)):
+
+```json
+{
+  "repositorios": [
+    { "path": "/home/usuario/forks/algum-projeto" },
+    { "path": "/home/usuario/forks/outro-projeto", "on_dirty_working_tree": "stash" }
+  ]
+}
+```
+
+Cada repositório listado precisa já ter um remote `upstream` configurado
+(`git remote add upstream <url>`), feito manualmente uma vez na criação do
+fork. Detalhes completos do contrato da CLI em
+[specs/001-update-fork-repositories/contracts/cli.md](specs/001-update-fork-repositories/contracts/cli.md).
+
+## 🚀 Uso
+
+```bash
+update-fork-repositories                       # usa o config default acima
+update-fork-repositories /caminho/outro.json    # ou um config alternativo
+```
+
+## ⏰ Agendamento (execução diária)
+
+O comando não gerencia seu próprio agendamento — use `cron` ou `systemd
+timer`. Exemplo de unit `systemd` em
+[specs/001-update-fork-repositories/contracts/systemd/](specs/001-update-fork-repositories/contracts/systemd/):
+
+```bash
+mkdir -p ~/.config/systemd/user
+cp specs/001-update-fork-repositories/contracts/systemd/update-fork-repositories.{service,timer} ~/.config/systemd/user/
+systemctl --user enable --now update-fork-repositories.timer
+```
+
+Alternativa via `cron` (`crontab -e`):
+
+```cron
+0 6 * * * /home/usuario/.local/bin/update-fork-repositories
+```
+
 ## 📚 Documentação
 
 - [Índice](docs/INDEX.md)
 - [Tarefas](docs/TODO.md)
+- [Especificação da feature](specs/001-update-fork-repositories/spec.md)
 
 ## 🤝 Contribuindo
 

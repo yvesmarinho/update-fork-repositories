@@ -1,0 +1,6 @@
+[Unit]
+Description=Sincroniza repositórios fork locais com seus upstreams
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/update-fork-repositories
