@@ -1,0 +1,347 @@
+# objetivo.yaml — Universal Spec-Driven Design Prerequisites Manifest
+# =============================================================================
+# Propósito:
+# - Artefato raiz (arquivo único) que guia constitution/specify/plan.
+# - Fornecer contexto, restrições, pré-requisitos e decisões iniciais.
+# - Incluir perguntas orientadoras (gates) para reduzir ambiguidade.
+#
+# Regras de uso:
+# - Este arquivo deve ser versionado.
+# - Campos "unknown" devem ser tratados como dívida de especificação.
+# - Segredos/credenciais NÃO devem existir aqui (somente referências).
+schema:
+  name: "objective-manifest"
+  version: "1.0"
+  last_updated: "2026-03-26"
+  authors:
+    - "yvesmarinho"
+
+# -----------------------------------------------------------------------------
+# 1) Identidade do projeto
+# -----------------------------------------------------------------------------
+project:
+  name: "update-fork-repositories"
+  codename: ""
+  domain: "software" # ex: software, infra, hardware, eletricidade, data, research
+  summary: "Código daemon para atualizar diáriamente meus repositórios Github que são forks"
+  problem_statement: "Repositórios fork locais ficam desatualizados em relação ao repositório de origem (upstream), exigindo sincronização manual repetitiva."
+  success_statement: "Rodar o script processa todos os forks listados no JSON de configuração, trazendo para cada um as atualizações do upstream, sem intervenção manual, registrando sucesso/falha por repositório em log."
+  docstyle: "Google Style Guide (https://google.github.io/styleguide/) - multi-language documentation standards"
+
+stakeholders:
+  owner:
+    team_or_person: "update-fork-repositories team"
+    contact: ""
+  users_personas:
+    - name: "PrimaryUser"
+      description: "Quem usa e como usa."
+  reviewers:
+    - "tech_lead"
+    - "security"
+    - "ops"
+  decision_makers:
+    - "update-fork-repositories owner"
+
+# -----------------------------------------------------------------------------
+# 2) Escopo e fronteiras (para evitar creep)
+# -----------------------------------------------------------------------------
+scope:
+  in_scope:
+    - "Ler um arquivo JSON com a lista de repositórios fork locais a atualizar"
+    - "Para cada fork, trazer (fetch/merge) as atualizações do repositório upstream (origem do fork)"
+    - "Registrar sucesso/falha por repositório via logging estruturado"
+    - "Execução single-shot adequada para ser chamada por cron/systemd timer"
+  out_of_scope:
+    - "Criação ou descoberta automática de forks via API do GitHub"
+    - "Resolução automática de conflitos de merge"
+    - "Interface web ou CLI interativa"
+    - "Notificações externas (e-mail, Slack, etc.) nesta primeira versão"
+  assumptions:
+    - "SSH já configurado para push/pull autenticado nos repositórios fork"
+    - "Cada repositório listado já é um clone git local válido com working tree limpa"
+    - "~/.local/bin está no PATH do usuário"
+    - "Executável instalado em ~/.local/bin/; JSON de configuração em ~/.config/update-fork-repositories/config.json"
+  constraints:
+    # Triângulo de ferro: tempo/custo/escopo/qualidade
+    timeline:
+      target_date: "unknown"
+      hard_deadline: false
+    budget:
+      max_budget: "unknown"
+      currency: "USD"
+    risk_tolerance: "medium" # low|medium|high
+    change_policy:
+      mode: "greenfield" # greenfield|brownfield
+      principles:
+        - "minimize_disruption"
+        - "backward_compatible_when_possible"
+      rebuild_allowed: true
+
+# -----------------------------------------------------------------------------
+# 3) Estado atual (brownfield context) e inventário de base existente
+# -----------------------------------------------------------------------------
+current_state:
+  description: "unknown"
+  existing_assets:
+    repos:
+      - url: ""
+        notes: ""
+    systems_services:
+      - name: ""
+        owner: ""
+        notes: ""
+    hardware_components:
+      - name: ""
+        model: ""
+        notes: ""
+    facilities_electrical:
+      - name: ""
+        standards: ""
+        notes: ""
+  known_pain_points:
+    - "unknown"
+  known_constraints:
+    - "unknown"
+
+# -----------------------------------------------------------------------------
+# 4) Pré-requisitos e dependências (HARD vs SOFT)
+# -----------------------------------------------------------------------------
+prerequisites:
+  hard:
+    - id: "access_or_permissions"
+      description: "Acessos/permissões necessários para começar."
+      status: "unknown" # ready|blocked|unknown
+      evidence: "" # link/commit/ticket
+    - id: "tools_environment"
+      description: "Ferramentas/ambiente mínimo (SO, compilador, runtime, etc.)."
+      status: "unknown"
+      evidence: ""
+  soft:
+    - id: "nice_to_have_tooling"
+      description: "Ferramentas recomendadas."
+      status: "unknown"
+      evidence: ""
+
+dependencies:
+  internal:
+    - name: "unknown"
+      type: "service|team|repo|hardware|facility|process"
+      criticality: "unknown" # low|medium|high|unknown
+      notes: ""
+  external:
+    - name: "unknown"
+      type: "vendor|standard|library|api|regulation"
+      criticality: "unknown"
+      notes: ""
+
+# -----------------------------------------------------------------------------
+# 5) Requisitos funcionais e não-funcionais (agnóstico)
+# -----------------------------------------------------------------------------
+requirements:
+  functional:
+    - "Ler e validar arquivo JSON de configuração com lista de repositórios fork (path local + upstream)"
+    - "Para cada repositório: git fetch do remote upstream"
+    - "Para cada repositório: merge/fast-forward das atualizações do upstream na branch default local"
+    - "Para cada repositório: git push do resultado para o remote origin (fork no GitHub)"
+    - "Continuar processando os demais repositórios mesmo se um falhar (graceful degradation)"
+    - "Retornar exit code 0 se todos os repositórios sincronizaram com sucesso, != 0 caso contrário"
+    - "Executável instalado em ~/.local/bin/ para ser chamado diretamente pelo PATH do usuário"
+    - "Ler JSON de configuração de ~/.config/update-fork-repositories/config.json por padrão, com override via argumento de linha de comando"
+  non_functional:
+    security:
+      classification: "internal" # public|internal|confidential|restricted|unknown
+      secrets_policy: "no_secrets_in_repo"
+      threat_model_required: false
+      authn_authz: "physical_access" # SSH key do usuário no ambiente local, sem token/credencial no código
+      audit_logging_required: true
+    reliability:
+      availability_target: "unknown" # execução batch diária, não é serviço always-on
+      rpo: "n/a"
+      rto: "n/a"
+      backup_required: false
+    performance:
+      latency_p95: "unknown"
+      throughput: "unknown"
+      resource_limits: "unknown"
+    maintainability:
+      documentation_required: true
+      test_coverage_target: "90%"
+      coding_standards: "PEP8 + regras em ~/.claude/rules/python.md (ruff, mypy, type hints, logging estruturado)"
+    compliance:
+      regulations:
+        - "unknown" # ex: LGPD, SOC2, ISO27001, IEC, ABNT, etc.
+    usability:
+      accessibility: "unknown"
+    portability:
+      platforms:
+        - "unknown" # linux, windows, embedded, mobile, etc.
+
+# -----------------------------------------------------------------------------
+# 6) Interface e integrações (agnóstico: API, UI, CLI, hardware IO)
+# -----------------------------------------------------------------------------
+interfaces:
+  user_interface:
+    type: "none" # none|web|mobile|desktop|hmi|unknown
+    notes: "Execução via linha de comando (script), sem UI"
+  programmatic_interface:
+    type: "none" # none|rest|grpc|mqtt|modbus|canbus|serial|unknown
+    versioning: "n/a"
+    backwards_compatibility_required: "unknown"
+  data_interfaces:
+    inputs:
+      - name: "config_forks"
+        format: "json"
+        notes: "Lista de repositórios fork locais a sincronizar (path + upstream); default em ~/.config/update-fork-repositories/config.json"
+    outputs:
+      - name: "log_execucao"
+        format: "text/log (stdout via logging)"
+        notes: "Log estruturado com resultado por repositório"
+  integrations:
+    - name: "unknown"
+      direction: "inbound|outbound|bidirectional|unknown"
+      protocol: "unknown"
+      auth: "unknown"
+      notes: ""
+
+# -----------------------------------------------------------------------------
+# 7) Dados (opcional, agnóstico)
+# -----------------------------------------------------------------------------
+data:
+  model_required: "unknown"
+  data_sources:
+    - name: "unknown"
+      type: "db|files|api|sensors|manual|unknown"
+      quality_expectations: "unknown"
+  data_retention:
+    retention_period: "unknown"
+    deletion_policy: "unknown"
+
+# -----------------------------------------------------------------------------
+# 8) Entregáveis (documentos/artefatos) — não é tarefa, é “contrato de saída”
+# -----------------------------------------------------------------------------
+deliverables:
+  required:
+    - "constitution"
+    - "specification"
+    - "plan"
+    - "risk_register"
+    - "readme_or_runbook"
+  optional:
+    - "architecture_diagrams"
+    - "threat_model"
+    - "test_plan"
+    - "migration_plan"
+
+# -----------------------------------------------------------------------------
+# 9) Regras de implementação (variável por projeto)
+# -----------------------------------------------------------------------------
+implementation_rules:
+  error_handling_policy:
+    applies: "by_layer" # always|by_module|by_layer|unknown
+    default_behavior: "CLI/entrypoint usa exit code (0=sucesso, !=0=falha); por repositório, exceções específicas são capturadas e convertidas em status (OK/NO_CHANGES/DIRTY/DIVERGED/ERROR) logado, sem interromper os demais"
+    notes: >
+      Falha em um repositório é logada e agregada (graceful degradation);
+      apenas a falha de leitura/validação do JSON de config é fail-fast.
+  parameter_validation:
+    required: true
+    strict_typing: true
+  documentation:
+    required: true
+    style: "reStructuredText" # pode ser alterado por projeto
+    doctest_required: true
+  testing:
+    required: true
+    strategy: "unit" # unit|integration|e2e|hardware_in_loop|unknown
+  coding_patterns:
+    - "n/a — script utilitário simples, sem padrões GoF necessários nesta fase"
+
+# -----------------------------------------------------------------------------
+# 10) Gates: perguntas orientadoras (o motor do Spec-Driven Design)
+# -----------------------------------------------------------------------------
+gates:
+  mode: "blocking" # blocking|non_blocking
+  questions:
+    # A) Problema e objetivos
+    - id: "goal_001"
+      category: "goals"
+      question: "Qual é o resultado mensurável (métricas) que define sucesso?"
+      expected_answer_type: "text"
+      required: true
+      current_answer: "Todos os forks listados no JSON ficam com a branch default sincronizada com o upstream após a execução; falhas são logadas por repositório sem interromper os demais."
+    - id: "goal_002"
+      category: "scope"
+      question: "O que explicitamente NÃO será feito (out-of-scope) nesta fase?"
+      expected_answer_type: "list"
+      required: true
+      current_answer:
+        [
+          "Descoberta automática de forks via API GitHub",
+          "Resolução automática de conflitos de merge",
+          "Interface web/CLI interativa",
+          "Notificações externas (e-mail/Slack)",
+        ]
+
+    # B) Contexto / brownfield
+    - id: "ctx_001"
+      category: "current_state"
+      question: "Quais ativos existentes NÃO podem ser quebrados (compatibilidade / contratos)?"
+      expected_answer_type: "list"
+      required: true
+      current_answer: ["n/a — projeto greenfield, sem ativos existentes a preservar"]
+    - id: "ctx_002"
+      category: "change_policy"
+      question: "Rebuild do core é permitido? Se sim, em quais partes e sob quais condições?"
+      expected_answer_type: "text"
+      required: true
+      current_answer: "Projeto greenfield — sem restrição de rebuild, ainda não há código implementado."
+
+    # C) Pré-requisitos e dependências
+    - id: "pre_001"
+      category: "prerequisites"
+      question: "Quais acessos/permissões/recursos são necessários para iniciar (e quem aprova)?"
+      expected_answer_type: "text"
+      required: true
+      current_answer: "SSH configurado com acesso de push aos forks no GitHub; git instalado no ambiente de execução (cron/systemd)."
+    - id: "dep_001"
+      category: "dependencies"
+      question: "Quais dependências internas/externas são críticas e quais são os riscos de atraso?"
+      expected_answer_type: "text"
+      required: true
+      current_answer: "Dependência externa única: binário `git` disponível no PATH. Sem dependências de bibliotecas de terceiros (apenas stdlib Python)."
+
+    # D) Qualidade, segurança, compliance
+    - id: "sec_001"
+      category: "security"
+      question: "Qual a classificação dos dados e quais requisitos mínimos de segurança (auth, auditoria, criptografia)?"
+      expected_answer_type: "text"
+      required: true
+      current_answer: "Dados internos (paths locais e URLs de repositórios públicos/privados). Autenticação via SSH key já configurada no ambiente; sem tokens/segredos no JSON de config ou no código. Log de auditoria por execução via logging estruturado."
+    - id: "nfr_001"
+      category: "reliability"
+      question: "Qual disponibilidade/continuidade é necessária (SLA/SLO, RPO/RTO)?"
+      expected_answer_type: "text"
+      required: false
+      current_answer: "n/a — execução batch diária via cron/systemd timer, não é serviço always-on."
+
+    # E) Interfaces (API/UI/Hardware)
+    - id: "if_001"
+      category: "interfaces"
+      question: "Quais interfaces existem/serão expostas (UI, CLI, API, serial, MQTT etc.) e seus contratos?"
+      expected_answer_type: "text"
+      required: true
+      current_answer: "Apenas CLI: script Python executado por linha de comando (manual ou via cron/systemd timer), lendo caminho do JSON de configuração como argumento."
+
+    # F) Entregáveis
+    - id: "deliv_001"
+      category: "deliverables"
+      question: "Quais documentos/artefatos são obrigatórios no final (constitution/spec/plan/runbook)?"
+      expected_answer_type: "list"
+      required: true
+      current_answer:
+        [
+          "constitution",
+          "specification",
+          "plan",
+          "risk_register",
+          "readme_or_runbook",
+        ]

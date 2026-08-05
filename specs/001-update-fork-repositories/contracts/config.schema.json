@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "update-fork-repositories config",
+  "type": "object",
+  "required": ["repositorios"],
+  "additionalProperties": false,
+  "properties": {
+    "repositorios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path"],
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Caminho absoluto do repositório git local (fork)."
+          },
+          "on_dirty_working_tree": {
+            "type": "string",
+            "enum": ["abort", "stash"],
+            "default": "abort",
+            "description": "Comportamento quando há mudanças locais não commitadas."
+          }
+        }
+      }
+    }
+  }
+}
