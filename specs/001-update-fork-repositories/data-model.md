@@ -27,11 +27,19 @@ Representa uma entrada do JSON de configuração — um fork local a sincronizar
 
 | Valor        | Significado |
 |--------------|-------------|
-| `OK`         | Repositório estava atrasado em relação ao upstream e foi atualizado (fast-forward + push) com sucesso. |
-| `NO_CHANGES` | Repositório já estava sincronizado com o upstream; nenhuma ação necessária. |
+| `OK`         | Repositório estava atrasado em relação ao remote de referência e foi atualizado (fast-forward, com push apenas se houver `upstream`). |
+| `NO_CHANGES` | Repositório já estava sincronizado com o remote de referência; nenhuma ação necessária. |
 | `DIRTY`      | Repositório tem mudanças não commitadas e `on_dirty_working_tree == "abort"`; nada foi alterado. |
-| `DIVERGED`   | Histórico local diverge do upstream; fast-forward não é possível; nada foi mesclado. |
-| `ERROR`      | Falha de infraestrutura/configuração (path inválido, remote `upstream` ausente, falha de rede, falha ao restaurar stash, etc.). |
+| `DIVERGED`   | Histórico local diverge do remote de referência; fast-forward não é possível; nada foi mesclado. |
+| `ERROR`      | Falha de infraestrutura (falha de rede/comando git, falha ao restaurar stash, etc.). |
+| `IGNORADO`   | `path` não existe ou não é um repositório git válido — pasta ignorada, sem afetar o exit code. |
+
+**Remote de referência**: se o repositório tiver um remote `upstream`
+configurado, ele é a fonte (fluxo original de fork) e o resultado é enviado
+(`push`) para `origin`. Se **não** houver `upstream` — caso típico de uma
+pasta apenas baixada/clonada, sem ser de fato um fork — o remote `origin` é
+usado como fonte, a atualização é feita **somente na cópia local**, e
+**nada é enviado** para lugar nenhum.
 
 ## ResultadoSincronizacao
 
@@ -52,7 +60,7 @@ mesma ordem em que aparecem no JSON.
 ## Regra de agregação (nível de execução)
 
 - Exit code do processo = `0` **somente se** todo `ResultadoSincronizacao`
-  da execução tiver `status` em `{OK, NO_CHANGES}`.
+  da execução tiver `status` em `{OK, NO_CHANGES, IGNORADO}`.
 - Qualquer `DIRTY`, `DIVERGED` ou `ERROR` em pelo menos um item força exit
   code `!= 0` para a execução inteira (FR-008), sem impedir que os demais
   repositórios tenham sido processados normalmente (FR-006).
@@ -64,8 +72,8 @@ condições específicas antes de serem convertidas em `ResultadoSincronizacao`
 pela camada de aplicação (nunca vazam para a camada de apresentação como
 exceção crua):
 
-- `RepositorioInvalidoError` — `path` não existe ou não é um repositório git.
-- `UpstreamAusenteError` — remote `upstream` não configurado no repositório.
+- `RepositorioInvalidoError` — `path` não existe ou não é um repositório git;
+  resulta em status `IGNORADO`, não em `ERROR`.
 - `ComandoGitFalhouError` — um comando `git` retornou código de saída de
   erro (rede, autenticação, etc.); mensagem original do git preservada.
 - `ConfiguracaoInvalidaError` — JSON de configuração ausente, malformado, ou

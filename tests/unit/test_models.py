@@ -2,7 +2,7 @@
 NOME: test_models
 TITULO: Testes dos modelos de domínio
 DATA: 05/08/2026
-MODIFICADO: 05/08/2026 12:03
+MODIFICADO: 05/08/2026 15:45
 VERSÃO: 0.1.0
 DEPEND: pytest
 
@@ -56,4 +56,4 @@ def test_resultado_sincronizacao_campos() -> None:
 def test_status_sincronizacao_valores_esperados() -> None:
     valores = {s.value for s in StatusSincronizacao}
 
-    assert valores == {"OK", "NO_CHANGES", "DIRTY", "DIVERGED", "ERROR"}
+    assert valores == {"OK", "NO_CHANGES", "DIRTY", "DIVERGED", "ERROR", "IGNORADO"}

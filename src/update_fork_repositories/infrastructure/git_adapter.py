@@ -2,7 +2,7 @@
 NOME: git_adapter
 TITULO: Adapter de operações git via subprocess
 DATA: 05/08/2026
-MODIFICADO: 05/08/2026 11:56
+MODIFICADO: 05/08/2026 15:57
 VERSÃO: 0.1.0
 DEPEND: git (binário externo, via subprocess)
 
@@ -10,6 +10,9 @@ Histórico de modificações:
 - 05/08/2026: criação inicial — validação, fetch, fast-forward, push (T013)
 - 05/08/2026: validação de path/.git e de remote upstream ausente (T013 — G1/G2)
 - 05/08/2026: working tree suja e stash (T019, T020)
+- 05/08/2026: remote de sincronização parametrizável (upstream OU origin) —
+  repositórios baixados/clonados sem fork real usam 'origin' como fonte,
+  sem que validar_repositorio exija 'upstream' configurado
 
 STATUS: DEV
 """
@@ -23,7 +26,6 @@ from pathlib import Path
 from update_fork_repositories.domain.exceptions import (
     ComandoGitFalhouError,
     RepositorioInvalidoError,
-    UpstreamAusenteError,
 )
 
 UPSTREAM_REMOTE_NAME = "upstream"
@@ -32,7 +34,9 @@ ORIGIN_REMOTE_NAME = "origin"
 
 def _run_git(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
     """Executa um comando git e retorna o resultado, sem levantar em caso de erro."""
-    logging.info("==> VAR: git_args TYPE: %s, CONTENT: %s", type(args), ["git", *args])
+    logging.info(
+        "==> REPO: %s, VAR: git_args TYPE: %s, CONTENT: %s", cwd, type(args), ["git", *args]
+    )
     return subprocess.run(
         ["git", *args],
         cwd=cwd,
@@ -54,23 +58,22 @@ def _run_git_ok(args: list[str], cwd: Path, acao: str) -> subprocess.CompletedPr
 
 def validar_repositorio(path: Path) -> None:
     """
-    Valida que ``path`` é um repositório git com remote ``upstream`` configurado.
+    Valida que ``path`` é um repositório git válido.
 
     :param path: Caminho do repositório local.
     :type path: Path
     :raises RepositorioInvalidoError: se ``path`` não existir ou não for um repositório git.
-    :raises UpstreamAusenteError: se o remote ``upstream`` não estiver configurado.
     """
-    logging.info("=== Função: validar_repositorio ===")
+    logging.info("=== Função: validar_repositorio === REPO: %s", path)
 
     if not (path / ".git").exists():
         raise RepositorioInvalidoError(f"{path} não existe ou não é um repositório git válido")
 
-    resultado = _run_git(["remote", "get-url", UPSTREAM_REMOTE_NAME], path)
-    if resultado.returncode != 0:
-        raise UpstreamAusenteError(
-            f"Remote '{UPSTREAM_REMOTE_NAME}' não configurado em {path}"
-        )
+
+def remote_existe(path: Path, remote_name: str) -> bool:
+    """Retorna True se o remote ``remote_name`` estiver configurado no repositório."""
+    resultado = _run_git(["remote", "get-url", remote_name], path)
+    return resultado.returncode == 0
 
 
 def branch_atual(path: Path) -> str:
@@ -101,42 +104,42 @@ def stash_pop(path: Path) -> bool:
     return resultado.returncode == 0
 
 
-def fetch_upstream(path: Path) -> None:
-    """Busca as atualizações do remote ``upstream``."""
-    _run_git_ok(["fetch", UPSTREAM_REMOTE_NAME], path, "executar git fetch upstream")
+def fetch_remote(path: Path, remote_name: str) -> None:
+    """Busca as atualizações do remote informado (``upstream`` ou ``origin``)."""
+    _run_git_ok(["fetch", remote_name], path, f"executar git fetch {remote_name}")
 
 
-def esta_divergente(path: Path, branch: str) -> bool:
+def esta_divergente(path: Path, branch: str, remote_name: str) -> bool:
     """
-    Verifica se o histórico local diverge do upstream (fast-forward não é possível).
+    Verifica se o histórico local diverge do remote (fast-forward não é possível).
 
-    :return: True se houver commits locais que não estão no upstream (divergência).
+    :return: True se houver commits locais que não estão no remote (divergência).
     :rtype: bool
     """
     resultado = _run_git_ok(
-        ["rev-list", "--left-right", "--count", f"{branch}...{UPSTREAM_REMOTE_NAME}/{branch}"],
+        ["rev-list", "--left-right", "--count", f"{branch}...{remote_name}/{branch}"],
         path,
-        "comparar branch local com upstream",
+        f"comparar branch local com {remote_name}",
     )
     a_frente_local, _atras_local = resultado.stdout.strip().split()
     return int(a_frente_local) > 0
 
 
-def upstream_tem_novidades(path: Path, branch: str) -> bool:
-    """Verifica se o upstream tem commits que a branch local ainda não possui."""
+def remote_tem_novidades(path: Path, branch: str, remote_name: str) -> bool:
+    """Verifica se o remote tem commits que a branch local ainda não possui."""
     resultado = _run_git_ok(
-        ["rev-list", "--left-right", "--count", f"{branch}...{UPSTREAM_REMOTE_NAME}/{branch}"],
+        ["rev-list", "--left-right", "--count", f"{branch}...{remote_name}/{branch}"],
         path,
-        "comparar branch local com upstream",
+        f"comparar branch local com {remote_name}",
     )
     _a_frente_local, atras_local = resultado.stdout.strip().split()
     return int(atras_local) > 0
 
 
-def fast_forward_merge(path: Path, branch: str) -> None:
-    """Aplica fast-forward merge das mudanças do upstream na branch local."""
+def fast_forward_merge(path: Path, branch: str, remote_name: str) -> None:
+    """Aplica fast-forward merge das mudanças do remote informado na branch local."""
     _run_git_ok(
-        ["merge", "--ff-only", f"{UPSTREAM_REMOTE_NAME}/{branch}"],
+        ["merge", "--ff-only", f"{remote_name}/{branch}"],
         path,
         "executar git merge --ff-only",
     )

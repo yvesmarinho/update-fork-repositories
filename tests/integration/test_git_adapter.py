@@ -23,11 +23,11 @@ from update_fork_repositories.infrastructure.git_adapter import (
     branch_atual,
     esta_divergente,
     fast_forward_merge,
-    fetch_upstream,
+    fetch_remote,
     push_origin,
+    remote_tem_novidades,
     stash_pop,
     stash_push,
-    upstream_tem_novidades,
     working_tree_sujo,
 )
 
@@ -71,7 +71,7 @@ def test_fetch_upstream_falha_levanta_comando_git_falhou(cenario_fork: Path) -> 
     _git(["remote", "add", "upstream", "/caminho/que/nao/existe"], cenario_fork)
 
     with pytest.raises(ComandoGitFalhouError):
-        fetch_upstream(cenario_fork)
+        fetch_remote(cenario_fork, "upstream")
 
 
 def test_fetch_e_fast_forward_traz_novidades_do_upstream(cenario_fork: Path) -> None:
@@ -80,12 +80,12 @@ def test_fetch_e_fast_forward_traz_novidades_do_upstream(cenario_fork: Path) -> 
     _git(["add", "."], upstream)
     _git(["-c", "user.email=t@t.com", "-c", "user.name=t", "commit", "-qm", "v2"], upstream)
 
-    fetch_upstream(cenario_fork)
+    fetch_remote(cenario_fork, "upstream")
 
-    assert upstream_tem_novidades(cenario_fork, "main") is True
-    assert esta_divergente(cenario_fork, "main") is False
+    assert remote_tem_novidades(cenario_fork, "main", "upstream") is True
+    assert esta_divergente(cenario_fork, "main", "upstream") is False
 
-    fast_forward_merge(cenario_fork, "main")
+    fast_forward_merge(cenario_fork, "main", "upstream")
 
     conteudo = (cenario_fork / "arquivo.txt").read_text(encoding="utf-8")
     assert conteudo == "v1\nv2\n"
@@ -97,8 +97,8 @@ def test_push_origin_envia_atualizacao_para_o_fork_remoto(cenario_fork: Path) ->
     _git(["add", "."], upstream)
     _git(["-c", "user.email=t@t.com", "-c", "user.name=t", "commit", "-qm", "v2"], upstream)
 
-    fetch_upstream(cenario_fork)
-    fast_forward_merge(cenario_fork, "main")
+    fetch_remote(cenario_fork, "upstream")
+    fast_forward_merge(cenario_fork, "main", "upstream")
     push_origin(cenario_fork, "main")
 
     fork_remoto = cenario_fork.parent / "fork-remoto.git"
@@ -108,9 +108,9 @@ def test_push_origin_envia_atualizacao_para_o_fork_remoto(cenario_fork: Path) ->
 
 
 def test_sem_novidades_no_upstream(cenario_fork: Path) -> None:
-    fetch_upstream(cenario_fork)
+    fetch_remote(cenario_fork, "upstream")
 
-    assert upstream_tem_novidades(cenario_fork, "main") is False
+    assert remote_tem_novidades(cenario_fork, "main", "upstream") is False
 
 
 def test_historico_divergente_nao_permite_fast_forward(cenario_fork: Path) -> None:
@@ -126,9 +126,9 @@ def test_historico_divergente_nao_permite_fast_forward(cenario_fork: Path) -> No
         upstream,
     )
 
-    fetch_upstream(cenario_fork)
+    fetch_remote(cenario_fork, "upstream")
 
-    assert esta_divergente(cenario_fork, "main") is True
+    assert esta_divergente(cenario_fork, "main", "upstream") is True
 
 
 def test_stash_push_e_pop_preserva_mudancas_locais(cenario_fork: Path) -> None:

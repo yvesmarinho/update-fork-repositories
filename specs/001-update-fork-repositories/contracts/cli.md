@@ -37,26 +37,29 @@ update-fork-repositories [CONFIG_PATH]
 
 Ver schema formal em [`config.schema.json`](./config.schema.json).
 
-## Saída — Log (stdout, via `logging`)
+## Saída — Log (arquivo, via `logging`)
 
-Uma linha estruturada por repositório processado, no formato padrão do
-`logging` do projeto (nível, função/linha, mensagem), contendo no mínimo:
-caminho do repositório e status (`OK` | `NO_CHANGES` | `DIRTY` | `DIVERGED`
-| `ERROR`). Erros de configuração (JSON ausente/inválido) são logados em
-nível `ERROR` antes de qualquer processamento de repositório, sem produzir
-resultados por item.
+Grava em `/var/log/enterprise/update-fork-repositories.log`. Uma linha
+estruturada por repositório processado, no formato padrão do `logging` do
+projeto (nível, função/linha, mensagem), sempre identificando o repositório
+em análise, contendo no mínimo: caminho do repositório e status (`OK` |
+`NO_CHANGES` | `DIRTY` | `DIVERGED` | `ERROR` | `IGNORADO`). Erros de
+configuração (JSON ausente/inválido) são logados em nível `ERROR` antes de
+qualquer processamento de repositório, sem produzir resultados por item.
 
 ## Saída — Exit code
 
 | Exit code | Condição |
 |-----------|----------|
-| `0`       | Configuração válida e todos os repositórios com status `OK` ou `NO_CHANGES`. |
+| `0`       | Configuração válida e todos os repositórios com status `OK`, `NO_CHANGES` ou `IGNORADO`. |
 | `1`       | Configuração ausente/inválida (fail fast, nenhum repositório processado) OU pelo menos um repositório com status `DIRTY`, `DIVERGED` ou `ERROR`. |
 
 ## Pré-condições assumidas (não validadas pelo comando)
 
-- Cada `path` já é um clone git com remotes `origin` (fork) e `upstream`
-  (origem) configurados.
+- Cada `path`, se existir e for um repositório git, tem ao menos o remote
+  `origin` configurado. O remote `upstream` é opcional: se ausente, o
+  repositório é tratado como uma cópia baixada (não um fork real) —
+  sincronizado a partir de `origin`, somente localmente, sem push.
 - Autenticação SSH já configurada no ambiente para `fetch`/`push`.
 - Binário `git` disponível no `PATH`.
 
