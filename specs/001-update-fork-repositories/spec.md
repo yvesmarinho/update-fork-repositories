@@ -35,9 +35,14 @@ com o mesmo HEAD do `upstream`.
    **When** o comando é executado, **Then** nenhuma alteração é feita e o
    repositório é reportado como sem mudanças.
 3. **Given** dois repositórios na configuração, um sincroniza com sucesso e
-   outro falha (ex.: sem remote `upstream`), **When** o comando é
-   executado, **Then** o primeiro é atualizado normalmente e o segundo é
-   reportado como falha, sem interromper o processamento do primeiro.
+   outro falha (ex.: erro de rede), **When** o comando é executado,
+   **Then** o primeiro é atualizado normalmente e o segundo é reportado
+   como falha, sem interromper o processamento do primeiro.
+4. **Given** um repositório sem remote `upstream` configurado (pasta
+   apenas baixada/clonada, não é de fato um fork), **When** o comando é
+   executado, **Then** o repositório é atualizado por fast-forward a
+   partir do `origin` **somente na cópia local**, e nada é enviado
+   (push) para nenhum remote.
 
 ---
 
@@ -108,14 +113,19 @@ agregada.
 ### Edge Cases
 
 - O que acontece quando o caminho (`path`) informado na configuração não
-  existe ou não é um repositório git? → Repositório é reportado como falha
-  (erro de configuração), demais repositórios continuam sendo processados.
+  existe ou não é um repositório git? → Repositório é **ignorado** (status
+  `IGNORADO`), sem afetar o exit code; demais repositórios continuam sendo
+  processados.
 - O que acontece quando o repositório não tem um remote `upstream`
-  configurado? → Repositório é reportado como falha, sem tentativa de
-  inferir ou criar automaticamente a URL do upstream.
-- O que acontece quando o histórico local diverge do `upstream` (não é
-  possível fast-forward)? → Repositório é reportado como divergente/falha;
-  nenhuma tentativa automática de merge com resolução de conflitos é feita.
+  configurado? → Não é tratado como erro: entende-se que o repositório foi
+  apenas baixado/clonado, não é um fork. O `origin` é usado como fonte de
+  atualização, o fast-forward é aplicado **somente na cópia local**, e
+  **nada é enviado** (push) para nenhum remote. Não há tentativa de
+  inferir ou criar automaticamente um remote `upstream`.
+- O que acontece quando o histórico local diverge do remote de referência
+  (`upstream` ou, na ausência dele, `origin`) e não é possível
+  fast-forward? → Repositório é reportado como divergente/falha; nenhuma
+  tentativa automática de merge com resolução de conflitos é feita.
 - O que acontece quando o arquivo de configuração JSON está ausente ou é
   inválido? → O processo falha imediatamente, antes de processar qualquer
   repositório (fail fast), com mensagem indicando o problema.
@@ -134,19 +144,23 @@ agregada.
   processar qualquer repositório, falhando imediatamente se ela for
   inválida ou o arquivo não existir.
 - **FR-003**: Para cada repositório listado, o sistema DEVE buscar as
-  atualizações do remote `upstream` já configurado no repositório local.
+  atualizações do remote `upstream`, se configurado; caso contrário, DEVE
+  usar o remote `origin` como fonte.
 - **FR-004**: O sistema DEVE aplicar apenas avanço rápido (fast-forward) ao
-  incorporar mudanças do `upstream`; histórico divergente NÃO deve ser
-  mesclado automaticamente.
+  incorporar mudanças do remote de referência; histórico divergente NÃO
+  deve ser mesclado automaticamente.
 - **FR-005**: Após incorporar as mudanças do `upstream` com sucesso, o
   sistema DEVE enviar (push) o resultado para o remote `origin` (o fork no
-  GitHub).
+  GitHub) — **apenas quando houver `upstream` configurado**. Quando a
+  atualização vier do próprio `origin` (sem `upstream`), o sistema NÃO
+  DEVE enviar nada para nenhum remote.
 - **FR-006**: A falha ao processar um repositório NÃO DEVE interromper o
   processamento dos demais repositórios da lista.
 - **FR-007**: O sistema DEVE registrar (log) o resultado do processamento
   de cada repositório de forma individual e identificável.
 - **FR-008**: O processo DEVE encerrar com código de saída de sucesso
-  apenas se todos os repositórios foram processados sem falha; caso
+  apenas se todos os repositórios foram processados sem falha (repositórios
+  ignorados por não serem um `.git` válido NÃO contam como falha); caso
   contrário, DEVE encerrar com código de saída de falha.
 - **FR-009**: O sistema DEVE respeitar, por repositório, uma configuração
   que determina o comportamento diante de mudanças locais não commitadas:
@@ -154,10 +168,14 @@ agregada.
   preservar temporariamente as mudanças (stash) durante a sincronização e
   restaurá-las ao final.
 - **FR-010**: Se o remote `upstream` não existir no repositório local, o
-  sistema DEVE reportar aquele repositório como falha, sem tentar criar o
-  remote automaticamente.
+  sistema NÃO DEVE tentar criá-lo automaticamente; DEVE, em vez disso,
+  sincronizar a partir do `origin` apenas na cópia local (sem push),
+  entendendo que o repositório não é um fork real.
 - **FR-011**: O executável instalado DEVE poder ser chamado diretamente
   pelo `PATH` do usuário (instalado em `~/.local/bin/`).
+- **FR-012**: Se o caminho (`path`) configurado não existir ou não for um
+  repositório git válido, o sistema DEVE ignorar aquele repositório
+  (status `IGNORADO`), registrando o motivo no log, sem contar como falha.
 
 ### Key Entities
 
@@ -167,17 +185,20 @@ agregada.
 - **Resultado de Sincronização**: representa o desfecho do processamento de
   um repositório em uma execução. Atributos: identificação do repositório,
   status (sucesso sem mudanças, sucesso com atualização, pendência de
-  mudanças locais, divergência de histórico, ou erro), detalhe/mensagem,
-  momento da execução.
+  mudanças locais, divergência de histórico, erro, ou ignorado),
+  detalhe/mensagem, momento da execução.
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
 - **SC-001**: Após uma execução bem-sucedida, 100% dos repositórios
-  configurados com working tree limpa e sem divergência de histórico ficam
-  com a branch local e o fork remoto (`origin`) idênticos ao HEAD do
-  `upstream`.
+  configurados com `upstream`, working tree limpa e sem divergência de
+  histórico ficam com a branch local e o fork remoto (`origin`) idênticos
+  ao HEAD do `upstream`.
+- **SC-006**: Repositórios sem `upstream` configurado (não são forks reais)
+  nunca têm nada enviado (push) para nenhum remote — apenas a cópia local
+  é atualizada a partir do `origin`.
 - **SC-002**: Uma falha em um repositório específico não reduz a taxa de
   sucesso dos demais repositórios da mesma execução — os demais continuam
   sendo sincronizados normalmente.

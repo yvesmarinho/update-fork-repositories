@@ -2,7 +2,7 @@
 NOME: test_cli
 TITULO: Testes da CLI — exit code agregado e resolução do config default
 DATA: 05/08/2026
-MODIFICADO: 05/08/2026 12:03
+MODIFICADO: 05/08/2026 15:44
 VERSÃO: 0.1.0
 DEPEND: pytest
 
@@ -46,6 +46,23 @@ def test_exit_code_zero_quando_tudo_ok(mock_carregar: object, mock_sincronizar: 
 def test_exit_code_zero_com_no_changes(mock_carregar: object, mock_sincronizar: object) -> None:
     mock_carregar.return_value = [RepositorioConfig(path="/tmp/fork")]
     mock_sincronizar.return_value = [_resultado(StatusSincronizacao.NO_CHANGES)]
+
+    assert main(["/tmp/config.json"]) == 0
+
+
+@patch("update_fork_repositories.cli.sincronizar_forks")
+@patch("update_fork_repositories.cli.carregar_config")
+def test_exit_code_zero_com_pasta_ignorada(
+    mock_carregar: object, mock_sincronizar: object
+) -> None:
+    mock_carregar.return_value = [
+        RepositorioConfig(path="/tmp/fork-ok"),
+        RepositorioConfig(path="/tmp/nao-e-git"),
+    ]
+    mock_sincronizar.return_value = [
+        _resultado(StatusSincronizacao.OK),
+        _resultado(StatusSincronizacao.IGNORADO),
+    ]
 
     assert main(["/tmp/config.json"]) == 0
 

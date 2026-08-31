@@ -2,13 +2,17 @@
 NOME: sincronizar_forks
 TITULO: Orquestração da sincronização de repositórios fork com upstream
 DATA: 05/08/2026
-MODIFICADO: 05/08/2026 12:02
+MODIFICADO: 05/08/2026 15:59
 VERSÃO: 0.1.0
 DEPEND: nenhuma (stdlib)
 
 Histórico de modificações:
 - 05/08/2026: fluxo OK/NO_CHANGES/DIVERGED/ERROR/DIRTY(abort) (T014)
 - 05/08/2026: política 'stash' para working tree suja (T021)
+- 05/08/2026: pasta sem .git é ignorada (IGNORADO) em vez de reportada como
+  ERROR; log identifica o repositório em processamento (alterações 01, 02)
+- 05/08/2026: sem remote 'upstream' configurado (repositório baixado, não é
+  fork), sincroniza a partir de 'origin' apenas localmente — sem push
 
 STATUS: DEV
 """
@@ -23,7 +27,6 @@ from zoneinfo import ZoneInfo
 from update_fork_repositories.domain.exceptions import (
     ComandoGitFalhouError,
     RepositorioInvalidoError,
-    UpstreamAusenteError,
 )
 from update_fork_repositories.domain.models import (
     OnDirtyWorkingTree,
@@ -59,6 +62,8 @@ def _agora() -> datetime:
 
 def _sincronizar_um(config: RepositorioConfig) -> ResultadoSincronizacao:
     path = Path(config.path)
+    logging.info("Processando repositório: %s", path)
+
     try:
         git_adapter.validar_repositorio(path)
 
@@ -67,7 +72,16 @@ def _sincronizar_um(config: RepositorioConfig) -> ResultadoSincronizacao:
 
         return _fetch_e_merge(path)
 
-    except (RepositorioInvalidoError, UpstreamAusenteError, ComandoGitFalhouError) as error:
+    except RepositorioInvalidoError as error:
+        logging.info("Ignorando pasta %s: %s", path, error)
+        return ResultadoSincronizacao(
+            path=str(path),
+            status=StatusSincronizacao.IGNORADO,
+            mensagem=str(error),
+            timestamp=_agora(),
+        )
+
+    except ComandoGitFalhouError as error:
         logging.error("Falha ao sincronizar %s: %s", path, error)
         return ResultadoSincronizacao(
             path=str(path),
@@ -114,28 +128,54 @@ def _tratar_working_tree_sujo(config: RepositorioConfig, path: Path) -> Resultad
 
 def _fetch_e_merge(path: Path) -> ResultadoSincronizacao:
     branch = git_adapter.branch_atual(path)
-    git_adapter.fetch_upstream(path)
 
-    if git_adapter.esta_divergente(path, branch):
+    tem_upstream = git_adapter.remote_existe(path, git_adapter.UPSTREAM_REMOTE_NAME)
+    remote_name = (
+        git_adapter.UPSTREAM_REMOTE_NAME if tem_upstream else git_adapter.ORIGIN_REMOTE_NAME
+    )
+
+    if not tem_upstream:
+        logging.info(
+            "Repositório %s sem remote 'upstream' — tratado como download (não é fork); "
+            "sincronizando somente localmente a partir de '%s', sem enviar nada",
+            path,
+            remote_name,
+        )
+
+    git_adapter.fetch_remote(path, remote_name)
+
+    if git_adapter.esta_divergente(path, branch, remote_name):
         return ResultadoSincronizacao(
             path=str(path),
             status=StatusSincronizacao.DIVERGED,
             mensagem=(
-                f"Histórico local diverge do upstream na branch '{branch}'; "
+                f"Histórico local diverge de '{remote_name}' na branch '{branch}'; "
                 "fast-forward não é possível"
             ),
             timestamp=_agora(),
         )
 
-    if not git_adapter.upstream_tem_novidades(path, branch):
+    if not git_adapter.remote_tem_novidades(path, branch, remote_name):
         return ResultadoSincronizacao(
             path=str(path),
             status=StatusSincronizacao.NO_CHANGES,
-            mensagem=f"Já sincronizado com o upstream na branch '{branch}'",
+            mensagem=f"Já sincronizado com '{remote_name}' na branch '{branch}'",
             timestamp=_agora(),
         )
 
-    git_adapter.fast_forward_merge(path, branch)
+    git_adapter.fast_forward_merge(path, branch, remote_name)
+
+    if not tem_upstream:
+        return ResultadoSincronizacao(
+            path=str(path),
+            status=StatusSincronizacao.OK,
+            mensagem=(
+                f"Branch '{branch}' atualizada por fast-forward a partir de 'origin' "
+                "(repositório sem fork configurado — nada foi enviado)"
+            ),
+            timestamp=_agora(),
+        )
+
     git_adapter.push_origin(path, branch)
     return ResultadoSincronizacao(
         path=str(path),

@@ -2,12 +2,13 @@
 NOME: models
 TITULO: Modelos de domínio para sincronização de forks
 DATA: 05/08/2026
-MODIFICADO: 05/08/2026 12:01
+MODIFICADO: 05/08/2026 15:43
 VERSÃO: 0.1.0
 DEPEND: nenhuma
 
 Histórico de modificações:
 - 05/08/2026: criação inicial (T005)
+- 05/08/2026: status IGNORADO para pastas sem .git (alteração 02)
 
 STATUS: DEV
 """
@@ -34,6 +35,7 @@ class StatusSincronizacao(StrEnum):
     DIRTY = "DIRTY"
     DIVERGED = "DIVERGED"
     ERROR = "ERROR"
+    IGNORADO = "IGNORADO"
 
 
 @dataclass(frozen=True)

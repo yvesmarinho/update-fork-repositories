@@ -2,7 +2,7 @@
 NOME: cli
 TITULO: Interface de linha de comando — sincronização de forks
 DATA: 05/08/2026
-MODIFICADO: 05/08/2026 12:02
+MODIFICADO: 05/08/2026 15:44
 VERSÃO: 0.1.0
 DEPEND: nenhuma (stdlib)
 
@@ -11,6 +11,7 @@ Histórico de modificações:
 - 05/08/2026: argparse, orquestração e exit code agregado (T015)
 - 05/08/2026: fail-fast em ConfiguracaoInvalidaError (T016)
 - 05/08/2026: default de CONFIG_PATH em ~/.config/update-fork-repositories/config.json (T024)
+- 05/08/2026: log gravado em /var/log/enterprise/update-fork-repositories.log
 
 STATUS: DEV
 """
@@ -28,12 +29,19 @@ from update_fork_repositories.domain.models import StatusSincronizacao
 from update_fork_repositories.infrastructure.config_loader import carregar_config
 
 DEFAULT_CONFIG_PATH = Path.home() / ".config" / "update-fork-repositories" / "config.json"
-STATUS_SUCESSO = {StatusSincronizacao.OK, StatusSincronizacao.NO_CHANGES}
+LOG_FILE = Path("/var/log/enterprise") / "update-fork-repositories.log"
+STATUS_NAO_FALHA = {
+    StatusSincronizacao.OK,
+    StatusSincronizacao.NO_CHANGES,
+    StatusSincronizacao.IGNORADO,
+}
 
 
 def config_logging() -> bool:
     """
     Configura o logging estruturado do processo, uma única vez.
+
+    Grava em :data:`LOG_FILE` (``/var/log/enterprise/update-fork-repositories.log``).
 
     :return: True após configuração (ou se já configurado).
     :rtype: bool
@@ -43,6 +51,7 @@ def config_logging() -> bool:
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s",
+        filename=LOG_FILE,
     )
     return True
 
@@ -68,8 +77,8 @@ def main(argv: list[str] | None = None) -> int:
 
     :param argv: Argumentos de linha de comando (default: ``sys.argv[1:]``).
     :type argv: list[str] | None
-    :return: Código de saída do processo — 0 se todos os repositórios
-        sincronizaram com sucesso (OK/NO_CHANGES), 1 caso contrário.
+    :return: Código de saída do processo — 0 se nenhum repositório falhou
+        (OK/NO_CHANGES/IGNORADO), 1 caso contrário.
     :rtype: int
     """
     config_logging()
@@ -86,12 +95,12 @@ def main(argv: list[str] | None = None) -> int:
     resultados = sincronizar_forks(repositorios)
 
     for resultado in resultados:
-        nivel = logging.INFO if resultado.status in STATUS_SUCESSO else logging.WARNING
+        nivel = logging.INFO if resultado.status in STATUS_NAO_FALHA else logging.WARNING
         logging.log(
             nivel, "%s: %s — %s", resultado.path, resultado.status.value, resultado.mensagem
         )
 
-    sucesso_total = all(r.status in STATUS_SUCESSO for r in resultados)
+    sucesso_total = all(r.status in STATUS_NAO_FALHA for r in resultados)
     return 0 if sucesso_total else 1
 
 
