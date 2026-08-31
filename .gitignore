@@ -57,6 +57,10 @@ logs/*
 !logs/README.md
 !scripts/logs/.gitkeep
 
+# graphify (grafo de conhecimento gerado localmente)
+graphify-out/
+_index.md
+
 # Infrastructure directories
 tmp/*
 !tmp/README.md
